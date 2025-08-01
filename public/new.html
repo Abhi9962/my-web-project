@@ -1,0 +1,2591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Color Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .upload-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .upload-btn:hover::before {
+            left: 100%;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 30px;
+            min-height: 600px;
+        }
+
+        .viewer-section {
+            flex: 2;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .colors-section {
+            flex: 1;
+            background: #ffffff;
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        #viewer {
+            width: 100%;
+            height: 750px; /* Set a fixed height for the viewer */
+            border-radius: 10px;
+            background: linear-gradient(45deg, #f0f2f5, #ffffff);
+            position: relative;
+            overflow: hidden;
+            /* Maintain aspect ratio to prevent stretching */
+            aspect-ratio: 4/3;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .colors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .color-item {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            border: 3px solid transparent;
+            overflow: hidden;
+        }
+
+        .color-item:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .color-item.active {
+            border-color: #667eea;
+            transform: scale(1.15);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .color-item::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+            transform: translateX(-100%);
+            transition: transform 0.6s;
+        }
+
+        .color-item:hover::after {
+            transform: translateX(100%);
+        }
+
+        .color-info {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .section-title {
+            color: #2c3e50;
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 50px;
+            color: #667eea;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .control-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            margin: 0 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .control-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .model-position-controls {
+            margin-top: 15px;
+            text-align: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .position-slider {
+            width: 150px;
+            margin: 0 10px;
+        }
+
+        .position-value {
+            font-weight: bold;
+            color: #667eea;
+            margin-left: 10px;
+            min-width: 60px;
+            display: inline-block;
+        }
+
+        .position-row {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .position-label {
+            font-weight: 600;
+            color: #2c3e50;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .measurement-section {
+            margin-top: 15px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .measurement-info {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .measurement-point {
+            width: 12px;
+            height: 12px;
+            background: #ff0000;
+            border: 2px solid white;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .measurement-line {
+            position: absolute;
+            height: 2px;
+            background: #ff0000;
+            transform-origin: left center;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        .measurement-text {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            pointer-events: none;
+            z-index: 1001;
+        }
+
+        .joystick-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .joystick {
+            width: 120px;
+            height: 120px;
+            border: 3px solid #667eea;
+            border-radius: 50%;
+            position: relative;
+            background: rgba(102, 126, 234, 0.1);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .joystick-knob {
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .joystick-label {
+            text-align: center;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .joystick-value {
+            text-align: center;
+            font-size: 12px;
+            color: #667eea;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 3D Model Color Detection Tool</h1>
+        
+        <div class="upload-section">
+            <input type="file" id="fileInput" class="file-input" accept=".glb,.gltf" />
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                📁 Upload GLB/GLTF Model
+            </button>
+            <input type="file" id="jsonInput" class="file-input" accept=".json" />
+            <button class="upload-btn" id="loadOverlayBtn">🩻 Overlay GLB on X-ray</button>
+        </div>
+
+        <div class="main-content">
+            <div class="viewer-section">
+                <h2 class="section-title">3D Model Viewer</h2>
+                <div id="viewer">
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p>Loading your 3D model...</p>
+                    </div>
+                </div>
+                <div class="controls">
+                                    <button class="control-btn" id="resetBtn" disabled>🔄 Reset View</button>
+                <button class="control-btn" id="wireframeBtn" disabled>🔲 Wireframe</button>
+                <button class="control-btn" id="animateBtn" disabled>🎬 Auto Rotate</button>
+                <button class="control-btn" id="boundingBoxBtn" disabled>📦 Show Bounding Box</button>
+                <button class="control-btn" id="debugColorsBtn" disabled>🔍 Debug Colors</button>
+                </div>
+
+                <div id="modelPositionControls" style="display: none; margin-bottom: 15px;">
+                    <h3 style="margin-bottom: 15px; color: #2c3e50;">🎯 Model Position Controls</h3>
+                    <div class="position-slider">
+                        <label>X Position: <span id="xValue">0.0</span></label>
+                        <input type="range" id="xSlider" min="-5" max="5" value="0" step="0.1">
+                    </div>
+                    <div class="position-slider">
+                        <label>Z Position: <span id="zValue">0.0</span></label>
+                        <input type="range" id="zSlider" min="-5" max="5" value="0" step="0.1">
+                    </div>
+                    <div class="position-slider">
+                        <label>Y Rotation: <span id="rotationValue">0°</span></label>
+                        <input type="range" id="rotationSlider" min="-180" max="180" value="0" step="1">
+                    </div>
+                    <button class="control-btn" id="resetPositionBtn">🔄 Reset Position</button>
+                    <button class="control-btn" id="activateLineDrawingBtn" style="margin-top: 10px; background: #ffc107; color: #000;">🎯 Activate Line Drawing</button>
+                    <button class="control-btn" id="clearLineDrawingBtn" style="margin-top: 10px; background: #dc3545; color: #fff; display: none;">🗑️ Clear Line Drawing</button>
+                    <button class="control-btn" id="exportReportBtn" style="margin-top: 10px; background: #28a745; color: #fff;">📄 Export Report</button>
+                </div>
+
+            </div>
+
+            <div class="colors-section">
+                <h2 class="section-title">Detected Colors</h2>
+                <div style="margin-bottom: 10px;">
+                    <label for="algorithmSelect"><strong>Color Detection Algorithm:</strong></label>
+                    <select id="algorithmSelect">
+                        <option value="simple">Simple</option>
+                        <option value="cluster">Cluster</option>
+                        <option value="kmeans">K-means</option>
+                        <option value="mediancut">Median Cut</option>
+                        <option value="hsvcluster">HSV Cluster</option>
+                        <option value="histogram">Histogram Binning</option>
+                    </select>
+                    <span id="algorithmDesc" style="font-size: 0.9em; color: #666; margin-left: 10px;"></span>
+                </div>
+                <div class="stats" id="stats" style="display: none;">
+                    <strong id="colorCount">0</strong> colors detected
+                </div>
+                <div class="colors-grid" id="colorsGrid"></div>
+            </div>
+            
+            <div class="measurements-section" style="flex: 1; background: #ffffff; border-radius: 15px; padding: 20px; border: 2px solid #e9ecef; max-height: 600px; overflow-y: auto;">
+                <h2 class="section-title">Screw Measurements</h2>
+                <div id="measurementsList" style="margin-top: 10px;">
+                    <p style="color: #666; font-style: italic;">No measurements yet. Draw lines to start tracking.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        let scene, camera, renderer, controls, model, originalMaterials = new Map();
+        let detectedColors = [];
+        let isWireframe = false;
+        let isAnimating = false;
+        let animationId;
+        let currentAlgorithm = 'simple';
+        let boundingBoxGroup = new THREE.Group();
+        let boundingBoxVisible = false;
+        let colorCubes = [];
+        let horizontalLine = null;
+        let raycaster, mouse;
+        let lineSliderContainer, lineYSlider, lineYValue;
+        let currentLineCube = null;
+        let modelYMin = 0, modelYMax = 0;
+        let directionSelect;
+        let directionOptions = [
+            { value: 'y+', label: 'Y+' },
+            { value: 'y-', label: 'Y-' },
+            { value: 'x+', label: 'X+' },
+            { value: 'x-', label: 'X-' },
+            { value: 'z+', label: 'Z+' },
+            { value: 'z-', label: 'Z-' }
+        ];
+        let joystickContainer, azimuthSlider, elevationSlider, lengthSlider, azimuthValue, elevationValue, lengthValue;
+        let modelDiagonal = 1;
+        
+        // Measurement tracking variables
+        let screwMeasurements = [];
+        let plateName = '';
+        let measurementCounter = 1;
+        
+
+        const algorithmDescriptions = {
+            simple: 'Unique colors from materials, textures, and vertices.',
+            cluster: 'Groups similar colors using a distance threshold.',
+            kmeans: 'Finds dominant colors using K-means clustering.',
+            mediancut: 'Median cut quantization for a representative palette.',
+            hsvcluster: 'Clusters colors by perceptual similarity in HSV space.',
+            histogram: 'Bins colors into a grid to show distribution.'
+        };
+
+        // Measurement system variables
+        let measurementPoints = [];
+        let measurementElements = [];
+        let scaleFactor = null; // pixels per mm (calculated from reference circle)
+        let referenceDiameter = 25.0; // mm - standard reference circle diameter
+        let markingModeEnabled = false;
+        let currentMeasurementLine = null;
+        
+        // Measurement system functions
+        function calculateScaleFactor() {
+            // For 3D models, we need to estimate scale factor based on model size
+            // This is a simplified approach - in real implementation, you'd have a reference object
+            if (model || overlayModel) {
+                // Estimate scale based on model bounding box
+                const box = new THREE.Box3();
+                if (model) box.expandByObject(model);
+                if (overlayModel) box.expandByObject(overlayModel);
+                
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                
+                // Assume a typical plate size of 50-100mm, adjust scale factor accordingly
+                const estimatedModelSizeMm = 80; // typical plate size
+                scaleFactor = maxDim / estimatedModelSizeMm;
+                
+                console.log(`Estimated scale factor: ${scaleFactor.toFixed(3)} pixels/mm`);
+                console.log(`Model size: ${maxDim.toFixed(2)} units, estimated ${estimatedModelSizeMm}mm`);
+            } else {
+                scaleFactor = 1.0; // fallback
+                console.log('No model loaded, using default scale factor');
+            }
+        }
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+        function updateLineAdjustmentDisplay() {
+            const lengthValue = document.getElementById('lineLengthValue');
+            const angleValue = document.getElementById('lineAngleValue');
+            const lengthSlider = document.getElementById('lineLengthSlider');
+            const angleSlider = document.getElementById('lineAngleSlider');
+            
+            if (lengthValue && lengthSlider) lengthValue.textContent = lengthSlider.value + ' px';
+            if (angleValue && angleSlider) angleValue.textContent = angleSlider.value + '°';
+        }
+        
+        function updateParallelLineDisplay() {
+            const parallelLinesValue = document.getElementById('parallelLinesValue');
+            const parallelSpacingValue = document.getElementById('parallelSpacingValue');
+            const parallelLinesSlider = document.getElementById('parallelLinesSlider');
+            const parallelSpacingSlider = document.getElementById('parallelSpacingSlider');
+            
+            if (parallelLinesValue && parallelLinesSlider) parallelLinesValue.textContent = parallelLinesSlider.value;
+            if (parallelSpacingValue && parallelSpacingSlider) parallelSpacingValue.textContent = parallelSpacingSlider.value + ' px';
+        }
+        
+        function redrawParallelLines() {
+            if (measurementPoints.length !== 2) return;
+            
+            const p1 = measurementPoints[0];
+            const p2 = measurementPoints[1];
+            const angleSlider = document.getElementById('lineAngleSlider');
+            if (!angleSlider) return;
+            
+            const angleDeg = parseFloat(angleSlider.value);
+            
+            // Clear existing parallel lines
+            clearParallelLines();
+            
+            // Redraw with new settings
+            drawParallelLines(p1, p2, angleDeg, Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)));
+        }
+        
+
+        
+
+
+        function init() {
+            const viewer = document.getElementById('viewer');
+            
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f2f5);
+            // Initialize overlayGroup after scene is created
+            overlayGroup = new THREE.Group();
+            scene.add(overlayGroup);
+            
+            // Camera setup with proper aspect ratio
+            const aspectRatio = 4/3; // Standard aspect ratio to prevent stretching
+            camera = new THREE.PerspectiveCamera(75, aspectRatio, 0.1, 1000);
+            camera.position.set(5, 5, 5);
+            
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            viewer.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            const pointLight = new THREE.PointLight(0xffffff, 0.5);
+            pointLight.position.set(-5, 5, -5);
+            scene.add(pointLight);
+            
+            // Add bounding box group to scene
+            scene.add(boundingBoxGroup);
+            
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+            
+            // File input handler
+            document.getElementById('fileInput').addEventListener('change', loadModel);
+            
+            // Control buttons
+            document.getElementById('resetBtn').addEventListener('click', resetView);
+            document.getElementById('wireframeBtn').addEventListener('click', toggleWireframe);
+            document.getElementById('animateBtn').addEventListener('click', toggleAnimation);
+            document.getElementById('boundingBoxBtn').addEventListener('click', toggleBoundingBox);
+            document.getElementById('debugColorsBtn').addEventListener('click', debugColors);
+
+            document.getElementById('algorithmSelect').addEventListener('change', function(e) {
+                currentAlgorithm = e.target.value;
+                document.getElementById('algorithmDesc').textContent = algorithmDescriptions[currentAlgorithm];
+                if (model) extractColors(model);
+            });
+            document.getElementById('algorithmDesc').textContent = algorithmDescriptions[currentAlgorithm];
+            
+            // Add direction select dropdown
+            directionSelect = document.createElement('select');
+            directionSelect.id = 'lineDirectionSelect';
+            directionOptions.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                directionSelect.appendChild(option);
+            });
+            const directionLabel = document.createElement('label');
+            directionLabel.textContent = 'Line Direction: ';
+            directionLabel.style.marginRight = '8px';
+            const controlsDiv = document.querySelector('.controls');
+            directionLabel.appendChild(directionSelect);
+            controlsDiv.appendChild(directionLabel);
+            // Setup slider for line adjustment
+            lineSliderContainer = document.createElement('div');
+            lineSliderContainer.id = 'lineSliderContainer';
+            lineSliderContainer.style.display = 'none';
+            lineSliderContainer.style.marginTop = '10px';
+            lineSliderContainer.innerHTML = `
+                <label for="lineYSlider"><strong>Adjust Line Height (Y):</strong></label>
+                <input type="range" id="lineYSlider" min="-10" max="10" step="0.01" value="0" style="width:200px;">
+                <span id="lineYValue">0</span>
+            `;
+            document.querySelector('.controls').appendChild(lineSliderContainer);
+            lineYSlider = document.getElementById('lineYSlider');
+            lineYValue = document.getElementById('lineYValue');
+            lineYSlider.addEventListener('input', function(e) {
+                if (!currentLineCube || !model) return;
+                const y = parseFloat(e.target.value);
+                lineYValue.textContent = y.toFixed(2);
+                updateVerticalLine(currentLineCube, y);
+            });
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            renderer.domElement.addEventListener('pointerdown', function(event) {
+                if (!model && !overlayModel) return;
+                
+                const rect = renderer.domElement.getBoundingClientRect();
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+                
+                // Check if we're in measurement mode (measurement section is visible and marking enabled)
+                const measurementSection = document.getElementById('measurementSection');
+                if (measurementSection && measurementSection.style.display !== 'none' && markingModeEnabled) {
+                    // Add measurement point
+                    addMeasurementPoint(mouseX, mouseY);
+                    return;
+                }
+                
+                // Original click handling for model interaction (only when marking mode is disabled)
+                if (!markingModeEnabled) {
+                    mouse.x = (mouseX / rect.width) * 2 - 1;
+                    mouse.y = -(mouseY / rect.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                    
+                // Intersect with all meshes in the model
+                const meshes = [];
+                if (model) {
+                    model.traverse(function(child) {
+                        if (child.isMesh && !child.userData.isBackground) meshes.push(child);
+                    });
+                }
+                if (overlayModel) {
+                    overlayModel.traverse(function(child) {
+                        if (child.isMesh && !child.userData.isBackground) meshes.push(child);
+                    });
+                }
+                    
+                const intersects = raycaster.intersectObjects(meshes);
+                if (intersects.length > 0) {
+                    const mesh = intersects[0].object;
+                    // Remove previous cubes
+                    colorCubes.forEach(cube => scene.remove(cube));
+                    colorCubes = [];
+                    // Remove previous line (if any)
+                    if (horizontalLine) {
+                        scene.remove(horizontalLine);
+                        horizontalLine = null;
+                    }
+                    // Hide slider/joystick
+                    if (lineSliderContainer) lineSliderContainer.style.display = 'none';
+                    if (joystickContainer) joystickContainer.style.display = 'none';
+                    currentLineCube = null;
+                    // Place a small cube at mesh center
+                    const meshCenter = mesh.getWorldPosition(new THREE.Vector3());
+                    const geometry = new THREE.BoxGeometry(0.07, 0.07, 0.07);
+                    const cubeMaterial = new THREE.MeshBasicMaterial({ color: mesh.material.color ? mesh.material.color.getHex() : 0xff0000 });
+                    const cube = new THREE.Mesh(geometry, cubeMaterial);
+                    cube.position.copy(meshCenter);
+                    scene.add(cube);
+                    colorCubes.push(cube);
+                        
+                        // If line drawing mode is active, draw line from this cube
+                        if (lineDrawingMode) {
+                            drawLineFromYellowCube(cube);
+                        } else {
+                            // Show joystick UI and draw line from this point (original behavior)
+                    drawVerticalLineFromCube(cube);
+                        }
+                    }
+                }
+            });
+            animate();
+            // Add joystick UI
+            joystickContainer = document.createElement('div');
+            joystickContainer.id = 'joystickContainer';
+            joystickContainer.style.display = 'none';
+            joystickContainer.style.marginTop = '10px';
+            joystickContainer.innerHTML = `
+                <label><strong>Azimuth (θ):</strong> <input type="range" id="azimuthSlider" min="0" max="360" step="1" value="0" style="width:120px;"> <span id="azimuthValue">0</span>°</label><br>
+                <label><strong>Elevation (φ):</strong> <input type="range" id="elevationSlider" min="-90" max="90" step="1" value="0" style="width:120px;"> <span id="elevationValue">0</span>°</label><br>
+                <label><strong>Length:</strong> <input type="range" id="lengthSlider" min="0.1" max="1" step="0.01" value="1" style="width:120px;"> <span id="lengthValue">1</span></label>
+            `;
+            document.querySelector('.controls').appendChild(joystickContainer);
+            azimuthSlider = document.getElementById('azimuthSlider');
+            elevationSlider = document.getElementById('elevationSlider');
+            lengthSlider = document.getElementById('lengthSlider');
+            azimuthValue = document.getElementById('azimuthValue');
+            elevationValue = document.getElementById('elevationValue');
+            lengthValue = document.getElementById('lengthValue');
+            azimuthSlider.addEventListener('input', updateJoystickLine);
+            elevationSlider.addEventListener('input', updateJoystickLine);
+            lengthSlider.addEventListener('input', updateJoystickLine);
+            
+            // Model position controls
+            const modelPositionControls = document.getElementById('modelPositionControls');
+            const resetModelPositionBtn = document.getElementById('resetPositionBtn');
+            
+            // Slider elements
+            const xSlider = document.getElementById('xSlider');
+            const zSlider = document.getElementById('zSlider');
+            const rotationSlider = document.getElementById('rotationSlider');
+            const xValue = document.getElementById('xValue');
+            const zValue = document.getElementById('zValue');
+            const rotationValue = document.getElementById('rotationValue');
+            
+            // Model position variables
+            let currentModelPosition = { x: 0, y: 0, z: 0 };
+            let currentModelRotation = { x: 0, y: 0, z: 0 };
+            
+            function updateModelPosition() {
+                if (model) {
+                    model.position.set(currentModelPosition.x, currentModelPosition.y, currentModelPosition.z);
+                    model.rotation.set(currentModelRotation.x, currentModelRotation.y, currentModelRotation.z);
+                }
+                if (overlayModel) {
+                    overlayModel.position.set(currentModelPosition.x, currentModelPosition.y, currentModelPosition.z);
+                    overlayModel.rotation.set(currentModelRotation.x, currentModelRotation.y, currentModelRotation.z);
+                }
+            }
+            
+            function updateSliderDisplay() {
+                if (xValue) xValue.textContent = currentModelPosition.x.toFixed(1);
+                if (zValue) zValue.textContent = currentModelPosition.z.toFixed(1);
+                if (rotationValue) rotationValue.textContent = `${Math.round(currentModelRotation.y * 180 / Math.PI)}°`;
+            }
+            
+            // X Slider functionality
+            if (xSlider) {
+                xSlider.addEventListener('input', function(e) {
+                    currentModelPosition.x = parseFloat(e.target.value);
+                    updateModelPosition();
+                    updateSliderDisplay();
+                });
+            }
+            
+            // Z Slider functionality
+            if (zSlider) {
+                zSlider.addEventListener('input', function(e) {
+                    currentModelPosition.z = parseFloat(e.target.value);
+                    updateModelPosition();
+                    updateSliderDisplay();
+                });
+            }
+            
+            // Rotation Slider functionality
+            if (rotationSlider) {
+                rotationSlider.addEventListener('input', function(e) {
+                    const degrees = parseFloat(e.target.value);
+                    currentModelRotation.y = (degrees * Math.PI) / 180; // Convert to radians
+                    updateModelPosition();
+                    updateSliderDisplay();
+                });
+            }
+            
+            if (resetModelPositionBtn) {
+                resetModelPositionBtn.addEventListener('click', function() {
+                    currentModelPosition = { x: 0, y: 0, z: 0 };
+                    currentModelRotation = { x: 0, y: 0, z: 0 };
+                    
+                    // Reset slider values
+                    if (xSlider) xSlider.value = 0;
+                    if (zSlider) zSlider.value = 0;
+                    if (rotationSlider) rotationSlider.value = 0;
+                    
+                    updateModelPosition();
+                    updateSliderDisplay();
+                });
+            }
+            
+            // Disable zooming in OrbitControls
+            controls.enableZoom = false;
+            
+            // Initialize measurement system
+            calculateScaleFactor();
+        }
+
+        function loadModel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const loading = document.getElementById('loading');
+            loading.classList.add('active');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const arrayBuffer = e.target.result;
+                const loader = new GLTFLoader();
+                
+                loader.parse(arrayBuffer, '', function(gltf) {
+                    // Clear previous model
+                    if (model) {
+                        scene.remove(model);
+                        originalMaterials.clear();
+                    }
+                    
+                    model = gltf.scene;
+                    scene.add(model);
+                    
+                    // Center and scale model
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 4 / maxDim;
+                    
+                    model.scale.setScalar(scale);
+                    model.position.sub(center.multiplyScalar(scale));
+                    
+                    // Extract colors
+                    extractColors(model);
+                    
+                    // Enable controls
+                    document.getElementById('resetBtn').disabled = false;
+                    document.getElementById('wireframeBtn').disabled = false;
+                    document.getElementById('animateBtn').disabled = false;
+                    document.getElementById('boundingBoxBtn').disabled = false;
+                    document.getElementById('debugColorsBtn').disabled = false;
+                    
+                    // Show model position controls
+                    const modelPositionControls = document.getElementById('modelPositionControls');
+                    if (modelPositionControls) {
+                        modelPositionControls.style.display = 'block';
+                    }
+                    
+                    // Initialize measurement system
+                    calculateScaleFactor();
+                    
+                    loading.classList.remove('active');
+                }, function(error) {
+                    console.error('Error loading model:', error);
+                    loading.classList.remove('active');
+                    alert('Error loading model. Please check if the file is a valid GLB/GLTF.');
+                });
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function extractColors(object) {
+            // Skip background objects
+            if (object.userData && object.userData.isBackground) return;
+            
+            if (currentAlgorithm === 'simple') {
+                extractColorsSimple(object);
+            } else if (currentAlgorithm === 'cluster') {
+                extractColorsCluster(object);
+            } else if (currentAlgorithm === 'kmeans') {
+                extractColorsKMeans(object);
+            } else if (currentAlgorithm === 'mediancut') {
+                extractColorsMedianCut(object);
+            } else if (currentAlgorithm === 'hsvcluster') {
+                extractColorsHSVCluster(object);
+            } else if (currentAlgorithm === 'histogram') {
+                extractColorsHistogram(object);
+            }
+            displayColors();
+        }
+
+        // --- Simple: original method ---
+        function extractColorsSimple(object) {
+            detectedColors = [];
+            const colorSet = new Set();
+            object.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    materials.forEach(material => {
+                        if (!originalMaterials.has(material.uuid)) {
+                            originalMaterials.set(material.uuid, {
+                                color: material.color ? material.color.clone() : null,
+                                map: material.map,
+                                wireframe: material.wireframe,
+                                emissive: material.emissive ? material.emissive.clone() : null
+                            });
+                        }
+                        if (material.color) {
+                            const hex = '#' + material.color.getHexString();
+                            colorSet.add(hex);
+                        }
+                        if (material.emissive && material.emissive.getHex() !== 0x000000) {
+                            const hex = '#' + material.emissive.getHexString();
+                            colorSet.add(hex);
+                        }
+                        const textureMaps = [
+                            material.map, material.normalMap, material.emissiveMap, material.specularMap,
+                            material.aoMap, material.lightMap, material.bumpMap, material.displacementMap,
+                            material.roughnessMap, material.metalnessMap
+                        ];
+                        textureMaps.forEach(textureMap => {
+                            if (textureMap && textureMap.image) {
+                                const textureColors = extractColorsFromTexture(textureMap);
+                                textureColors.forEach(color => colorSet.add(color));
+                            }
+                        });
+                    });
+                }
+                if (child.geometry && child.geometry.attributes.color) {
+                    const colors = child.geometry.attributes.color;
+                    for (let i = 0; i < colors.count; i++) {
+                        const r = Math.round(colors.getX(i) * 255);
+                        const g = Math.round(colors.getY(i) * 255);
+                        const b = Math.round(colors.getZ(i) * 255);
+                        const hex = '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+                        colorSet.add(hex);
+                    }
+                }
+            });
+            detectedColors = Array.from(colorSet).map(hex => ({
+                hex: hex,
+                rgb: hexToRgb(hex),
+                name: getColorName(hex)
+            }));
+        }
+
+        // --- Cluster: group similar colors by distance ---
+        function extractColorsCluster(object) {
+            const allColors = [];
+            object.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    materials.forEach(material => {
+                        if (material.color) allColors.push(material.color.clone());
+                        if (material.emissive && material.emissive.getHex() !== 0x000000) allColors.push(material.emissive.clone());
+                        const textureMaps = [
+                            material.map, material.normalMap, material.emissiveMap, material.specularMap,
+                            material.aoMap, material.lightMap, material.bumpMap, material.displacementMap,
+                            material.roughnessMap, material.metalnessMap
+                        ];
+                        textureMaps.forEach(textureMap => {
+                            if (textureMap && textureMap.image) {
+                                const textureColors = extractColorsFromTexture(textureMap, true);
+                                textureColors.forEach(rgb => allColors.push(new THREE.Color(rgb.r/255, rgb.g/255, rgb.b/255)));
+                            }
+                        });
+                    });
+                }
+                if (child.geometry && child.geometry.attributes.color) {
+                    const colors = child.geometry.attributes.color;
+                    for (let i = 0; i < colors.count; i++) {
+                        allColors.push(new THREE.Color(colors.getX(i), colors.getY(i), colors.getZ(i)));
+                    }
+                }
+            });
+            // Cluster colors by RGB distance
+            const threshold = 40; // adjustable
+            const clusters = [];
+            allColors.forEach(color => {
+                const rgb = { r: Math.round(color.r*255), g: Math.round(color.g*255), b: Math.round(color.b*255) };
+                let found = false;
+                for (let cluster of clusters) {
+                    if (colorDistance(cluster.rgb, rgb) < threshold) {
+                        cluster.count++;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) clusters.push({ rgb, count: 1 });
+            });
+            detectedColors = clusters.sort((a,b)=>b.count-a.count).map(cluster => ({
+                hex: rgbToHex(cluster.rgb),
+                rgb: cluster.rgb,
+                name: getColorName(rgbToHex(cluster.rgb)),
+                count: cluster.count
+            }));
+        }
+
+        // --- K-means: dominant color quantization ---
+        function extractColorsKMeans(object) {
+            const allColors = [];
+            object.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    materials.forEach(material => {
+                        if (material.color) allColors.push({ r: Math.round(material.color.r*255), g: Math.round(material.color.g*255), b: Math.round(material.color.b*255) });
+                        if (material.emissive && material.emissive.getHex() !== 0x000000) allColors.push({ r: Math.round(material.emissive.r*255), g: Math.round(material.emissive.g*255), b: Math.round(material.emissive.b*255) });
+                        const textureMaps = [
+                            material.map, material.normalMap, material.emissiveMap, material.specularMap,
+                            material.aoMap, material.lightMap, material.bumpMap, material.displacementMap,
+                            material.roughnessMap, material.metalnessMap
+                        ];
+                        textureMaps.forEach(textureMap => {
+                            if (textureMap && textureMap.image) {
+                                const textureColors = extractColorsFromTexture(textureMap, true);
+                                textureColors.forEach(rgb => allColors.push(rgb));
+                            }
+                        });
+                    });
+                }
+                if (child.geometry && child.geometry.attributes.color) {
+                    const colors = child.geometry.attributes.color;
+                    for (let i = 0; i < colors.count; i++) {
+                        allColors.push({ r: Math.round(colors.getX(i)*255), g: Math.round(colors.getY(i)*255), b: Math.round(colors.getZ(i)*255) });
+                    }
+                }
+            });
+            const k = 8; // number of clusters
+            const clusters = kMeansColors(allColors, k);
+            detectedColors = clusters.map(cluster => ({
+                hex: rgbToHex(cluster),
+                rgb: cluster,
+                name: getColorName(rgbToHex(cluster))
+            }));
+        }
+
+        // --- Median Cut Quantization ---
+        function extractColorsMedianCut(object) {
+            const allColors = collectAllRGBColors(object);
+            const palette = medianCutQuant(allColors, 8); // 8 colors
+            detectedColors = palette.map(rgb => ({
+                hex: rgbToHex(rgb),
+                rgb: rgb,
+                name: getColorName(rgbToHex(rgb))
+            }));
+        }
+        // Median cut quantization (simple, for small color sets)
+        function medianCutQuant(pixels, k) {
+            if (pixels.length === 0) return [];
+            let boxes = [{ pixels, rmin:0, rmax:255, gmin:0, gmax:255, bmin:0, bmax:255 }];
+            for (let i = 1; i < k; i++) {
+                // Find box with most pixels
+                boxes.sort((a,b)=>b.pixels.length-a.pixels.length);
+                let box = boxes.shift();
+                if (!box || box.pixels.length < 2) break;
+                // Find channel with largest range
+                let rRange = Math.max(...box.pixels.map(p=>p.r)) - Math.min(...box.pixels.map(p=>p.r));
+                let gRange = Math.max(...box.pixels.map(p=>p.g)) - Math.min(...box.pixels.map(p=>p.g));
+                let bRange = Math.max(...box.pixels.map(p=>p.b)) - Math.min(...box.pixels.map(p=>p.b));
+                let channel = rRange >= gRange && rRange >= bRange ? 'r' : (gRange >= bRange ? 'g' : 'b');
+                // Sort and split
+                box.pixels.sort((a,b)=>a[channel]-b[channel]);
+                let mid = Math.floor(box.pixels.length/2);
+                boxes.push({ pixels: box.pixels.slice(0,mid) });
+                boxes.push({ pixels: box.pixels.slice(mid) });
+            }
+            // Average each box
+            return boxes.map(box => {
+                let r = 0, g = 0, b = 0;
+                box.pixels.forEach(p => { r+=p.r; g+=p.g; b+=p.b; });
+                let n = box.pixels.length;
+                return { r: Math.round(r/n), g: Math.round(g/n), b: Math.round(b/n) };
+            });
+        }
+
+        // --- HSV Cluster ---
+        function extractColorsHSVCluster(object) {
+            const allColors = collectAllRGBColors(object);
+            const clusters = hsvCluster(allColors, 8, 0.12, 0.2, 0.2); // 8 clusters, hue/sat/val thresholds
+            detectedColors = clusters.map(cluster => ({
+                hex: rgbToHex(cluster.rgb),
+                rgb: cluster.rgb,
+                name: getColorName(rgbToHex(cluster.rgb)),
+                count: cluster.count
+            }));
+        }
+        function hsvCluster(pixels, k, hueThresh, satThresh, valThresh) {
+            // Convert to HSV and cluster by thresholds
+            const clusters = [];
+            pixels.forEach(rgb => {
+                const hsv = rgbToHsv(rgb);
+                let found = false;
+                for (let c of clusters) {
+                    if (Math.abs(hsv.h - c.hsv.h) < hueThresh && Math.abs(hsv.s - c.hsv.s) < satThresh && Math.abs(hsv.v - c.hsv.v) < valThresh) {
+                        c.pixels.push(rgb);
+                        c.count++;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) clusters.push({ hsv, pixels: [rgb], count: 1 });
+            });
+            // Average each cluster
+            return clusters.map(c => {
+                let r=0,g=0,b=0;
+                c.pixels.forEach(p=>{r+=p.r;g+=p.g;b+=p.b;});
+                let n=c.pixels.length;
+                return { rgb: { r:Math.round(r/n), g:Math.round(g/n), b:Math.round(b/n) }, count: c.count, hsv: c.hsv };
+            }).sort((a,b)=>b.count-a.count);
+        }
+        function rgbToHsv(rgb) {
+            let r=rgb.r/255, g=rgb.g/255, b=rgb.b/255;
+            let max=Math.max(r,g,b), min=Math.min(r,g,b);
+            let h,s,v=max;
+            let d=max-min;
+            s=max===0?0:d/max;
+            if(max===min)h=0;
+            else{
+                switch(max){
+                    case r: h=(g-b)/d+(g<b?6:0); break;
+                    case g: h=(b-r)/d+2; break;
+                    case b: h=(r-g)/d+4; break;
+                }
+                h/=6;
+            }
+            return {h,s,v};
+        }
+
+        // --- Histogram Binning ---
+        function extractColorsHistogram(object) {
+            const allColors = collectAllRGBColors(object);
+            const bins = {};
+            const binSize = 32; // 8 bins per channel
+            allColors.forEach(rgb => {
+                const r = Math.floor(rgb.r/binSize)*binSize;
+                const g = Math.floor(rgb.g/binSize)*binSize;
+                const b = Math.floor(rgb.b/binSize)*binSize;
+                const key = `${r},${g},${b}`;
+                if (!bins[key]) bins[key] = { r, g, b, count: 0 };
+                bins[key].count++;
+            });
+            detectedColors = Object.values(bins).sort((a,b)=>b.count-a.count).slice(0,12).map(bin => ({
+                hex: rgbToHex(bin),
+                rgb: { r: bin.r, g: bin.g, b: bin.b },
+                name: getColorName(rgbToHex(bin)),
+                count: bin.count
+            }));
+        }
+
+        // --- Utility functions for color clustering ---
+        function colorDistance(c1, c2) {
+            return Math.sqrt(
+                Math.pow(c1.r - c2.r, 2) +
+                Math.pow(c1.g - c2.g, 2) +
+                Math.pow(c1.b - c2.b, 2)
+            );
+        }
+        function rgbToHex(rgb) {
+            return '#' + ((1 << 24) + (rgb.r << 16) + (rgb.g << 8) + rgb.b).toString(16).slice(1);
+        }
+        // Simple k-means for small color sets
+        function kMeansColors(data, k) {
+            if (data.length === 0) return [];
+            // Randomly initialize centroids
+            let centroids = [];
+            for (let i = 0; i < k; i++) {
+                centroids.push(data[Math.floor(Math.random() * data.length)]);
+            }
+            let changed = true;
+            let assignments = new Array(data.length);
+            let maxIter = 10;
+            while (changed && maxIter-- > 0) {
+                changed = false;
+                // Assign
+                for (let i = 0; i < data.length; i++) {
+                    let minDist = Infinity, idx = 0;
+                    for (let j = 0; j < k; j++) {
+                        let dist = colorDistance(data[i], centroids[j]);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            idx = j;
+                        }
+                    }
+                    if (assignments[i] !== idx) {
+                        changed = true;
+                        assignments[i] = idx;
+                    }
+                }
+                // Update
+                let sums = Array.from({length: k}, () => ({r:0,g:0,b:0,count:0}));
+                for (let i = 0; i < data.length; i++) {
+                    let idx = assignments[i];
+                    sums[idx].r += data[i].r;
+                    sums[idx].g += data[i].g;
+                    sums[idx].b += data[i].b;
+                    sums[idx].count++;
+                }
+                for (let j = 0; j < k; j++) {
+                    if (sums[j].count > 0) {
+                        centroids[j] = {
+                            r: Math.round(sums[j].r / sums[j].count),
+                            g: Math.round(sums[j].g / sums[j].count),
+                            b: Math.round(sums[j].b / sums[j].count)
+                        };
+                    }
+                }
+            }
+            // Remove duplicates
+            const unique = [];
+            centroids.forEach(c => {
+                if (!unique.some(u => colorDistance(u, c) < 10)) unique.push(c);
+            });
+            return unique;
+        }
+        // --- Modified extractColorsFromTexture for cluster/kmeans ---
+        function extractColorsFromTexture(texture, asRGB=false) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = texture.image;
+            canvas.width = Math.min(img.width, 100);
+            canvas.height = Math.min(img.height, 100);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const colors = asRGB ? [] : new Set();
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const r = imageData.data[i];
+                const g = imageData.data[i + 1];
+                const b = imageData.data[i + 2];
+                const a = imageData.data[i + 3];
+                if (a > 128) {
+                    if (asRGB) colors.push({r,g,b});
+                    else {
+                        const hex = '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+                        colors.add(hex);
+                    }
+                }
+            }
+            return asRGB ? colors : Array.from(colors);
+        }
+
+        // --- Helper to collect all RGB colors from model ---
+        function collectAllRGBColors(object) {
+            const allColors = [];
+            object.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    materials.forEach(material => {
+                        if (material.color) allColors.push({ r: Math.round(material.color.r*255), g: Math.round(material.color.g*255), b: Math.round(material.color.b*255) });
+                        if (material.emissive && material.emissive.getHex() !== 0x000000) allColors.push({ r: Math.round(material.emissive.r*255), g: Math.round(material.emissive.g*255), b: Math.round(material.emissive.b*255) });
+                        const textureMaps = [
+                            material.map, material.normalMap, material.emissiveMap, material.specularMap,
+                            material.aoMap, material.lightMap, material.bumpMap, material.displacementMap,
+                            material.roughnessMap, material.metalnessMap
+                        ];
+                        textureMaps.forEach(textureMap => {
+                            if (textureMap && textureMap.image) {
+                                const textureColors = extractColorsFromTexture(textureMap, true);
+                                textureColors.forEach(rgb => allColors.push(rgb));
+                            }
+                        });
+                    });
+                }
+                if (child.geometry && child.geometry.attributes.color) {
+                    const colors = child.geometry.attributes.color;
+                    for (let i = 0; i < colors.count; i++) {
+                        allColors.push({ r: Math.round(colors.getX(i)*255), g: Math.round(colors.getY(i)*255), b: Math.round(colors.getZ(i)*255) });
+                    }
+                }
+            });
+            return allColors;
+        }
+
+        function displayColors() {
+            const colorsGrid = document.getElementById('colorsGrid');
+            const stats = document.getElementById('stats');
+            const colorCount = document.getElementById('colorCount');
+            
+            colorsGrid.innerHTML = '';
+            colorCount.textContent = detectedColors.length;
+            stats.style.display = 'block';
+            
+            detectedColors.forEach((color, index) => {
+                const colorItem = document.createElement('div');
+                colorItem.className = 'color-item';
+                colorItem.style.backgroundColor = color.hex;
+                colorItem.title = `${color.name}\n${color.hex}\nRGB(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b})`;
+                
+                colorItem.addEventListener('click', () => highlightColor(color, colorItem));
+                
+                const colorInfo = document.createElement('div');
+                colorInfo.className = 'color-info';
+                colorInfo.innerHTML = `
+                    <strong>${color.name}</strong><br>
+                    ${color.hex}<br>
+                    RGB(${color.rgb.r}, ${color.rgb.g}, ${color.rgb.b})
+                `;
+                
+                const container = document.createElement('div');
+                container.appendChild(colorItem);
+                container.appendChild(colorInfo);
+                colorsGrid.appendChild(container);
+            });
+        }
+
+        function highlightColor(selectedColor, colorElement) {
+            // No longer used: color selection from palette
+        }
+        // Reset also removes cubes
+        function resetView() {
+            if (camera && controls) {
+                camera.position.set(5, 5, 5);
+                controls.reset();
+            }
+            // Reset materials
+            if (model) {
+                model.traverse(function(child) {
+                    if (child.isMesh && child.material) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach((material, index) => {
+                            const original = originalMaterials.get(material.uuid);
+                            if (original) {
+                                if (original.color) material.color.copy(original.color);
+                                if (material.emissive) {
+                                material.emissive.setHex(0x000000);
+                                material.emissiveIntensity = 0;
+                                }
+                                material.wireframe = original.wireframe;
+                            }
+                        });
+                    }
+                });
+            }
+            // Clear bounding box
+            clearBoundingBox();
+            boundingBoxVisible = false;
+            const boundingBoxBtn = document.getElementById('boundingBoxBtn');
+            if (boundingBoxBtn) {
+                boundingBoxBtn.textContent = '📦 Show Bounding Box';
+            }
+            // Remove active states
+            document.querySelectorAll('.color-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            // Remove cubes
+            colorCubes.forEach(cube => scene.remove(cube));
+            colorCubes = [];
+            if (horizontalLine) {
+                scene.remove(horizontalLine);
+                horizontalLine = null;
+            }
+            if (joystickContainer) joystickContainer.style.display = 'none';
+            if (lineSliderContainer) lineSliderContainer.style.display = 'none';
+            currentLineCube = null;
+        }
+
+        function toggleWireframe() {
+            isWireframe = !isWireframe;
+            
+            if (model) {
+                model.traverse(function(child) {
+                    if (child.isMesh && child.material) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(material => {
+                            material.wireframe = isWireframe;
+                        });
+                    }
+                });
+            }
+            
+            const btn = document.getElementById('wireframeBtn');
+            btn.textContent = isWireframe ? '🔳 Solid' : '🔲 Wireframe';
+        }
+
+        function toggleAnimation() {
+            isAnimating = !isAnimating;
+            const btn = document.getElementById('animateBtn');
+            btn.textContent = isAnimating ? '⏸️ Stop' : '🎬 Auto Rotate';
+        }
+
+        function toggleBoundingBox() {
+            boundingBoxVisible = !boundingBoxVisible;
+            const btn = document.getElementById('boundingBoxBtn');
+            
+            if (boundingBoxVisible) {
+                createBoundingBox();
+                btn.textContent = '📦 Hide Bounding Box';
+            } else {
+                clearBoundingBox();
+                btn.textContent = '📦 Show Bounding Box';
+            }
+        }
+
+        function createBoundingBox() {
+            // Clear existing bounding box
+            clearBoundingBox();
+            
+            if (!model) return;
+            
+            const targetColor = '#f7d33d'; // RGB(247, 211, 61)
+            const targetRGB = { r: 247, g: 211, b: 61 };
+            const colorTolerance = 50; // Increased tolerance for better detection
+            
+            const targetMeshes = [];
+            const foundColors = new Set();
+            
+            console.log('Searching for meshes with color:', targetColor, 'RGB:', targetRGB);
+            
+            // Find all meshes with the target color
+            model.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    
+                    materials.forEach(material => {
+                        if (material.color) {
+                            const materialRGB = {
+                                r: Math.round(material.color.r * 255),
+                                g: Math.round(material.color.g * 255),
+                                b: Math.round(material.color.b * 255)
+                            };
+                            
+                            const materialHex = '#' + material.color.getHexString();
+                            foundColors.add(materialHex);
+                            
+                            // First try exact hex match
+                            if (materialHex.toLowerCase() === targetColor.toLowerCase()) {
+                                targetMeshes.push(child);
+                                console.log(`✓ Exact hex match found: ${materialHex} - Mesh: ${child.name || 'unnamed'}`);
+                            } else {
+                                // Fallback to RGB distance check
+                                const colorDistance = Math.sqrt(
+                                    Math.pow(materialRGB.r - targetRGB.r, 2) +
+                                    Math.pow(materialRGB.g - targetRGB.g, 2) +
+                                    Math.pow(materialRGB.b - targetRGB.b, 2)
+                                );
+                                
+                                console.log(`Mesh color: ${materialHex} RGB(${materialRGB.r}, ${materialRGB.g}, ${materialRGB.b}) - Distance: ${colorDistance.toFixed(2)}`);
+                                
+                                if (colorDistance <= colorTolerance) {
+                                    targetMeshes.push(child);
+                                    console.log('✓ Target mesh found by RGB distance!');
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+            
+            console.log('All found colors:', Array.from(foundColors));
+            console.log('Target meshes found:', targetMeshes.length);
+            
+            if (targetMeshes.length === 0) {
+                console.log('No meshes found with color #f7d33d');
+                alert('No meshes found with color #f7d33d. Check console for available colors.');
+                return;
+            }
+            
+            // Calculate bounding box for all target meshes
+            const boundingBox = new THREE.Box3();
+            targetMeshes.forEach(mesh => {
+                boundingBox.expandByObject(mesh);
+            });
+            
+            // Check if bounding box is valid
+            if (boundingBox.isEmpty()) {
+                console.log('Bounding box is empty, using mesh positions directly');
+                targetMeshes.forEach(mesh => {
+                    boundingBox.expandByPoint(mesh.position);
+                });
+            }
+            
+            // Create wireframe bounding box
+            const size = boundingBox.getSize(new THREE.Vector3());
+            const center = boundingBox.getCenter(new THREE.Vector3());
+            
+            console.log('Bounding box size:', size);
+            console.log('Bounding box center:', center);
+            
+            const boxGeometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+            
+            const boxMaterial = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const wireframeBox = new THREE.Mesh(boxGeometry, boxMaterial);
+            
+            // Position the bounding box
+            wireframeBox.position.copy(center);
+            
+            // Add some padding to the bounding box
+            wireframeBox.scale.multiplyScalar(1.2);
+            
+            boundingBoxGroup.add(wireframeBox);
+            
+            console.log(`✓ Bounding box created for ${targetMeshes.length} meshes with color #f7d33d`);
+        }
+
+        function clearBoundingBox() {
+            while (boundingBoxGroup.children.length > 0) {
+                boundingBoxGroup.remove(boundingBoxGroup.children[0]);
+            }
+        }
+
+        function debugColors() {
+            if (!model) {
+                alert('Please load a model first');
+                return;
+            }
+            
+            const allColors = new Set();
+            const colorDetails = [];
+            
+            console.log('=== DEBUG: All Colors in Model ===');
+            
+            model.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    
+                    materials.forEach(material => {
+                        if (material.color) {
+                            const hex = '#' + material.color.getHexString();
+                            const rgb = {
+                                r: Math.round(material.color.r * 255),
+                                g: Math.round(material.color.g * 255),
+                                b: Math.round(material.color.b * 255)
+                            };
+                            
+                            allColors.add(hex);
+                            colorDetails.push({
+                                hex: hex,
+                                rgb: rgb,
+                                meshName: child.name || 'unnamed',
+                                uuid: child.uuid
+                            });
+                            
+                            console.log(`Mesh: ${child.name || 'unnamed'} | Color: ${hex} | RGB(${rgb.r}, ${rgb.g}, ${rgb.b})`);
+                        }
+                    });
+                }
+            });
+            
+            console.log('=== SUMMARY ===');
+            console.log('Total unique colors found:', allColors.size);
+            console.log('All colors:', Array.from(allColors));
+            
+            // Check if target color exists
+            const targetColor = '#f7d33d';
+            const targetRGB = { r: 247, g: 211, b: 61 };
+            
+            console.log('=== TARGET COLOR CHECK ===');
+            console.log('Looking for:', targetColor, 'RGB(247, 211, 61)');
+            
+            let found = false;
+            colorDetails.forEach(detail => {
+                const distance = Math.sqrt(
+                    Math.pow(detail.rgb.r - targetRGB.r, 2) +
+                    Math.pow(detail.rgb.g - targetRGB.g, 2) +
+                    Math.pow(detail.rgb.b - targetRGB.b, 2)
+                );
+                
+                if (distance <= 30) {
+                    console.log(`✓ FOUND! ${detail.hex} RGB(${detail.rgb.r}, ${detail.rgb.g}, ${detail.rgb.b}) - Distance: ${distance.toFixed(2)} - Mesh: ${detail.meshName}`);
+                    found = true;
+                }
+            });
+            
+            if (!found) {
+                console.log('❌ Target color #f7d33d not found in model');
+                console.log('Closest colors:');
+                colorDetails.forEach(detail => {
+                    const distance = Math.sqrt(
+                        Math.pow(detail.rgb.r - targetRGB.r, 2) +
+                        Math.pow(detail.rgb.g - targetRGB.g, 2) +
+                        Math.pow(detail.rgb.b - targetRGB.b, 2)
+                    );
+                    console.log(`  ${detail.hex} RGB(${detail.rgb.r}, ${detail.rgb.g}, ${detail.rgb.b}) - Distance: ${distance.toFixed(2)}`);
+                });
+            }
+            
+            alert(`Debug complete! Check console for details.\nFound ${allColors.size} unique colors.\nTarget color found: ${found ? 'YES' : 'NO'}`);
+        }
+
+        function onWindowResize() {
+            const viewer = document.getElementById('viewer');
+            // Maintain proper aspect ratio to prevent stretching
+            const aspectRatio = 4/3;
+            camera.aspect = aspectRatio;
+            camera.updateProjectionMatrix();
+            renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (isAnimating && model) {
+                model.rotation.y += 0.01;
+            }
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        function getColorName(hex) {
+            const colors = {
+                '#000000': 'Black', '#ffffff': 'White', '#ff0000': 'Red',
+                '#00ff00': 'Green', '#0000ff': 'Blue', '#ffff00': 'Yellow',
+                '#ff00ff': 'Magenta', '#00ffff': 'Cyan', '#800000': 'Maroon',
+                '#008000': 'Dark Green', '#000080': 'Navy', '#808000': 'Olive',
+                '#800080': 'Purple', '#008080': 'Teal', '#c0c0c0': 'Silver',
+                '#808080': 'Gray', '#ffa500': 'Orange', '#ffc0cb': 'Pink'
+            };
+            
+            return colors[hex.toLowerCase()] || 'Custom Color';
+        }
+
+        function drawHorizontalLineAtY(y) {
+            if (horizontalLine) {
+                scene.remove(horizontalLine);
+                horizontalLine = null;
+            }
+            if (!model) return;
+            // Find the cube that was clicked (use the last intersection from the event handler)
+            // Instead, pass the cube object directly to this function
+            // So, let's change the event handler and this function signature:
+            // drawHorizontalLineFromCube(cube)
+        }
+
+        // New function: draw a line from the cube to the X boundary
+        function drawHorizontalLineFromCube(cube) {
+            if (horizontalLine) {
+                scene.remove(horizontalLine);
+                horizontalLine = null;
+            }
+            if (!model || !cube) return;
+            const box = new THREE.Box3().setFromObject(model);
+            const min = box.min, max = box.max;
+            const start = cube.position.clone();
+            // Determine which X boundary is farther from the cube
+            const distToMin = Math.abs(start.x - min.x);
+            const distToMax = Math.abs(start.x - max.x);
+            const endX = distToMin > distToMax ? min.x : max.x;
+            const end = new THREE.Vector3(endX, start.y, start.z);
+            const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+            const material = new THREE.LineBasicMaterial({ color: 0x007bff, linewidth: 3 });
+            horizontalLine = new THREE.Line(geometry, material);
+            scene.add(horizontalLine);
+        }
+
+        function updateJoystickLine() {
+            if (!currentLineCube || !model) return;
+            azimuthValue.textContent = azimuthSlider.value;
+            elevationValue.textContent = elevationSlider.value;
+            lengthValue.textContent = (+lengthSlider.value * modelDiagonal).toFixed(2);
+            drawJoystickLine(currentLineCube,
+                parseFloat(azimuthSlider.value),
+                parseFloat(elevationSlider.value),
+                parseFloat(lengthSlider.value) * modelDiagonal
+            );
+        }
+
+        function drawJoystickLine(start, azimuthDeg, elevationDeg, length) {
+            if (horizontalLine) {
+                scene.remove(horizontalLine);
+                horizontalLine = null;
+            }
+            // Convert angles to radians
+            const azimuth = azimuthDeg * Math.PI / 180;
+            const elevation = elevationDeg * Math.PI / 180;
+            // Spherical to Cartesian
+            const dx = length * Math.cos(elevation) * Math.sin(azimuth);
+            const dy = length * Math.sin(elevation);
+            const dz = length * Math.cos(elevation) * Math.cos(azimuth);
+            const end = new THREE.Vector3(start.x + dx, start.y + dy, start.z + dz);
+            const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+            const material = new THREE.LineBasicMaterial({ color: 0x007bff, linewidth: 3 });
+            horizontalLine = new THREE.Line(geometry, material);
+            scene.add(horizontalLine);
+        }
+
+        function drawVerticalLineFromCube(cube) {
+            if (horizontalLine) {
+                scene.remove(horizontalLine);
+                horizontalLine = null;
+            }
+            if (!model || !cube) return;
+            const box = new THREE.Box3().setFromObject(model);
+            const min = box.min, max = box.max;
+            modelYMin = min.y;
+            modelYMax = max.y;
+            const start = cube.position.clone();
+            // Calculate model diagonal for max length
+            modelDiagonal = min.distanceTo(max);
+            // Show joystick UI
+            joystickContainer.style.display = 'block';
+            // Set default values
+            azimuthSlider.value = 0;
+            elevationSlider.value = 0;
+            lengthSlider.min = 0.1;
+            lengthSlider.max = 1;
+            lengthSlider.value = 1;
+            azimuthValue.textContent = '0';
+            elevationValue.textContent = '0';
+            lengthValue.textContent = modelDiagonal.toFixed(2);
+            lengthSlider.max = 1;
+            // Draw initial line
+            currentLineCube = start;
+            updateJoystickLine();
+            // Hide old slider if present
+            lineSliderContainer.style.display = 'none';
+        }
+
+        function updateVerticalLine(cubePos, newY) {
+            if (!horizontalLine) return;
+            const start = cubePos.clone();
+            const dir = directionSelect.value;
+            let end;
+            if (dir === 'y+' || dir === 'y-') {
+                end = new THREE.Vector3(start.x, newY, start.z);
+            } else {
+                // Should not happen, but fallback to previous logic
+                end = new THREE.Vector3(start.x, newY, start.z);
+            }
+            const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+            horizontalLine.geometry.dispose();
+            horizontalLine.geometry = geometry;
+        }
+
+        // Overlay GLB on X-ray logic
+        let overlayTransform = null;
+        let overlayGLBUrl = null;
+        let overlayXrayUrl = null;
+        let overlayModel = null;
+        let overlayXrayImg = null;
+        let overlayGroup; // Declare globally, initialize in init()
+
+        document.getElementById('loadOverlayBtn').addEventListener('click', () => {
+            document.getElementById('jsonInput').click();
+        });
+        document.getElementById('jsonInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        try {
+            const data = JSON.parse(ev.target.result);
+            
+            // Validate required fields
+            if (!data.placed_model) {
+                throw new Error('JSON is missing required placed_model data');
+            }
+            
+            overlayTransform = data.placed_model;
+            
+            // Use glb_filename if available, otherwise fall back to placed_model.filename
+            const glbFile = data.glb_filename || data.placed_model.filename;
+            
+            // Set GLB path - handle both relative and absolute paths
+            overlayGLBUrl = glbFile.startsWith('/') 
+                ? '..' + glbFile 
+                : '../Project/plates/' + glbFile;
+            
+            // Set X-ray path if available
+            overlayXrayUrl = data.xray_image_path 
+                ? (data.xray_image_path.startsWith('/') 
+                    ? '..' + data.xray_image_path 
+                    : '../Project/' + data.xray_image_path)
+                : '../Project/ap.png'; // Default fallback
+            
+            // Store X-ray dimensions if available
+            if (data.xray_width || data.xray_height) {
+                overlayTransform.xray_width = data.xray_width;
+                overlayTransform.xray_height = data.xray_height;
+            }
+            
+            // Extract plate name from JSON
+            plateName = data.glb_filename || data.plate_name || data.placed_model?.plate_name || 'Unknown Plate';
+            console.log('Plate name extracted:', plateName);
+            
+            loadOverlayXrayAndGLB();
+            
+        } catch (err) {
+            console.error('Error parsing JSON:', err);
+            alert('Invalid JSON file: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+});
+
+        function loadOverlayXrayAndGLB() {
+    // Remove previous overlay
+    if (overlayGroup) overlayGroup.clear();
+    if (overlayModel) {
+        scene.remove(overlayModel);
+        overlayModel = null;
+    }
+    
+    // Load X-ray image as background (as a plane in Three.js)
+    if (overlayXrayUrl) {
+        const loader = new THREE.TextureLoader();
+        loader.load(overlayXrayUrl, function(texture) {
+            // Check if we have transform data for resizing
+            if (overlayTransform && overlayTransform.xray_width) {
+                const img = texture.image;
+                const originalWidth = img.width;
+                const originalHeight = img.height;
+                
+                // Calculate target dimensions
+                let targetWidth = overlayTransform.xray_width;
+                let targetHeight = originalHeight * (targetWidth / originalWidth);
+                
+                // Create canvas to resize the image
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                
+                // Draw resized image
+                ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                
+                // Create new texture from resized canvas
+                const resizedTexture = new THREE.Texture(canvas);
+                resizedTexture.needsUpdate = true;
+                scene.background = resizedTexture;
+            } else {
+                // Set the X-ray image as the scene background without resizing
+                scene.background = texture;
+            }
+            
+            // Reset camera
+            camera.position.set(0, 0, 8);
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            
+            // Maintain aspect ratio
+            const aspectRatio = 4/3;
+            camera.aspect = aspectRatio;
+            camera.updateProjectionMatrix();
+        });
+    }
+    
+    // Load GLB model and apply transform
+    if (overlayGLBUrl) {
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.load(overlayGLBUrl, function(gltf) {
+            overlayModel = gltf.scene;
+            
+            // Apply scale if specified in transform
+            const scale = overlayTransform?.scale_factor || 1.0;
+            overlayModel.scale.setScalar(scale * 1.6); // Slightly larger
+            
+            // Apply rotation if specified
+            if (overlayTransform?.rotation) {
+                overlayModel.rotation.set(
+                    overlayTransform.rotation[0],
+                    overlayTransform.rotation[1],
+                    overlayTransform.rotation[2]
+                );
+            }
+            
+            // Apply position offset if specified
+            if (overlayTransform?.position_offset) {
+                overlayModel.position.set(
+                    overlayTransform.position_offset[0] * 0.01, // Scale down
+                    overlayTransform.position_offset[1] * -0.01, // Invert Y
+                    0
+                );
+            } else {
+                overlayModel.position.set(0, 0, 0);
+            }
+            
+            overlayGroup.add(overlayModel);
+            
+            // Show controls
+            const modelPositionControls = document.getElementById('modelPositionControls');
+            
+            if (modelPositionControls) {
+                modelPositionControls.style.display = 'block';
+            }
+            
+            // Initialize measurement system
+            calculateScaleFactor();
+            
+        }, undefined, function(err) {
+            console.error('Failed to load GLB:', err);
+            alert('Failed to load GLB model: ' + err.message);
+        });
+    }
+}
+
+        // Initialize when page loads
+        window.addEventListener('load', init);
+
+        // Measurement button event listeners
+        const clearMeasurementBtn = document.getElementById('clearMeasurementBtn');
+        const exportMeasurementBtn = document.getElementById('exportMeasurementBtn');
+        const enableMarkingBtn = document.getElementById('enableMarkingBtn');
+        
+        if (clearMeasurementBtn) {
+            clearMeasurementBtn.addEventListener('click', clearMeasurement);
+        }
+        if (exportMeasurementBtn) {
+            exportMeasurementBtn.addEventListener('click', exportMeasurementResults);
+        }
+        if (enableMarkingBtn) {
+            enableMarkingBtn.addEventListener('click', function() {
+                if (markingModeEnabled) {
+                    disableMarkingMode();
+                } else {
+                    enableMarkingMode();
+                }
+            });
+        }
+        
+        // Line adjustment controls
+        const lineLengthSlider = document.getElementById('lineLengthSlider');
+        const lineAngleSlider = document.getElementById('lineAngleSlider');
+        
+        if (lineLengthSlider) {
+            lineLengthSlider.addEventListener('input', function() {
+                console.log('Length slider moved to:', this.value);
+                updateLineAdjustmentDisplay();
+                if (lineDrawingMode && yellowCubeLines.length > 0) {
+                    console.log('Calling adjustYellowCubeLine from length slider');
+                    adjustYellowCubeLine();
+                } else {
+                    console.log('Calling adjustMeasurementLine from length slider');
+                    adjustMeasurementLine();
+                }
+            });
+        }
+        
+        if (lineAngleSlider) {
+            lineAngleSlider.addEventListener('input', function() {
+                console.log('Angle slider moved to:', this.value);
+                updateLineAdjustmentDisplay();
+                if (lineDrawingMode && yellowCubeLines.length > 0) {
+                    console.log('Calling adjustYellowCubeLine from angle slider');
+                    adjustYellowCubeLine();
+                } else {
+                    console.log('Calling adjustMeasurementLine from angle slider');
+                    adjustMeasurementLine();
+                }
+            });
+        }
+        
+        // Parallel line controls
+        const parallelLinesSlider = document.getElementById('parallelLinesSlider');
+        const parallelSpacingSlider = document.getElementById('parallelSpacingSlider');
+        
+        if (parallelLinesSlider) {
+            parallelLinesSlider.addEventListener('input', function() {
+                updateParallelLineDisplay();
+                redrawParallelLines();
+            });
+        }
+        
+        if (parallelSpacingSlider) {
+            parallelSpacingSlider.addEventListener('input', function() {
+                updateParallelLineDisplay();
+                redrawParallelLines();
+            });
+        }
+
+        function updateModelPosition() {
+            if (model) {
+                model.position.set(currentModelPosition.x, currentModelPosition.y, currentModelPosition.z);
+            }
+            if (overlayModel) {
+                overlayModel.position.set(currentModelPosition.x, currentModelPosition.y, currentModelPosition.z);
+            }
+        }
+
+        // Line drawing from yellow cubes
+        let lineDrawingMode = false;
+        let yellowCubeLines = [];
+        let selectedYellowCube = null;
+        let lineDrawingElements = [];
+        
+        function activateLineDrawing() {
+            lineDrawingMode = true;
+            const activateBtn = document.getElementById('activateLineDrawingBtn');
+            const clearBtn = document.getElementById('clearLineDrawingBtn');
+            if (activateBtn) {
+                activateBtn.textContent = '⏹️ Deactivate Line Drawing';
+                activateBtn.style.background = '#dc3545';
+                activateBtn.style.color = '#fff';
+            }
+            if (clearBtn) {
+                clearBtn.style.display = 'inline-block';
+            }
+            
+            // Disable model position controls during line drawing
+            const xSlider = document.getElementById('xSlider');
+            const zSlider = document.getElementById('zSlider');
+            const rotationSlider = document.getElementById('rotationSlider');
+            const resetPositionBtn = document.getElementById('resetPositionBtn');
+            
+            if (xSlider) xSlider.disabled = true;
+            if (zSlider) zSlider.disabled = true;
+            if (rotationSlider) rotationSlider.disabled = true;
+            if (resetPositionBtn) resetPositionBtn.disabled = true;
+            
+            // Add visual feedback
+            if (xSlider) xSlider.style.opacity = '0.5';
+            if (zSlider) zSlider.style.opacity = '0.5';
+            if (rotationSlider) rotationSlider.style.opacity = '0.5';
+            if (resetPositionBtn) resetPositionBtn.style.opacity = '0.5';
+            
+            // Freeze the model by disabling OrbitControls
+            if (controls) {
+                controls.enabled = false;
+                controls.enableRotate = false;
+                controls.enablePan = false;
+                controls.enableZoom = false;
+            }
+            
+            console.log('Line drawing mode activated - model frozen, click on yellow cubes to draw lines');
+        }
+        
+        function deactivateLineDrawing() {
+            lineDrawingMode = false;
+            const activateBtn = document.getElementById('activateLineDrawingBtn');
+            if (activateBtn) {
+                activateBtn.textContent = '🎯 Activate Line Drawing';
+                activateBtn.style.background = '#ffc107';
+                activateBtn.style.color = '#000';
+            }
+            
+            // Re-enable model position controls
+            const xSlider = document.getElementById('xSlider');
+            const zSlider = document.getElementById('zSlider');
+            const rotationSlider = document.getElementById('rotationSlider');
+            const resetPositionBtn = document.getElementById('resetPositionBtn');
+            
+            if (xSlider) xSlider.disabled = false;
+            if (zSlider) zSlider.disabled = false;
+            if (rotationSlider) rotationSlider.disabled = false;
+            if (resetPositionBtn) resetPositionBtn.disabled = false;
+            
+            // Remove visual feedback
+            if (xSlider) xSlider.style.opacity = '1';
+            if (zSlider) zSlider.style.opacity = '1';
+            if (rotationSlider) rotationSlider.style.opacity = '1';
+            if (resetPositionBtn) resetPositionBtn.style.opacity = '1';
+            
+            // Unfreeze the model by re-enabling OrbitControls
+            if (controls) {
+                controls.enabled = true;
+                controls.enableRotate = true;
+                controls.enablePan = true;
+                controls.enableZoom = false; // Keep zoom disabled as per original design
+            }
+            
+            console.log('Line drawing mode deactivated - model movement restored');
+        }
+        
+        function drawLineFromYellowCube(cube) {
+            if (!lineDrawingMode) return;
+            
+            selectedYellowCube = cube;
+            
+            // Get cube position in screen coordinates
+            const rect = renderer.domElement.getBoundingClientRect();
+            const vector = cube.position.clone();
+            vector.project(camera);
+            
+            const screenX = (vector.x * 0.5 + 0.5) * rect.width;
+            const screenY = (vector.y * -0.5 + 0.5) * rect.height;
+            
+            // Set base length to 70mm in pixels
+            const baseLength = scaleFactor * 70;
+            const lineLength = baseLength;
+            const lineAngle = 0; // Horizontal line
+            
+            // Create line element
+            const line = document.createElement('div');
+            line.className = 'measurement-line';
+            line.style.left = screenX + 'px';
+            line.style.top = screenY + 'px';
+            line.style.width = lineLength + 'px';
+            line.style.transform = `rotate(${lineAngle}deg)`;
+            line.style.borderColor = '#ffc107'; // Yellow color for cube lines
+            line.style.borderWidth = '3px';
+            line.style.cursor = 'pointer'; // Add pointer cursor
+            document.getElementById('viewer').appendChild(line);
+            lineDrawingElements.push(line);
+            
+            // Create measurement text
+            const distanceMm = (lineLength / scaleFactor) / 10;
+            const text = document.createElement('div');
+            text.className = 'measurement-text';
+            text.textContent = `${distanceMm.toFixed(1)} mm`;
+            text.style.left = (screenX + lineLength / 2) + 'px';
+            text.style.top = (screenY - 30) + 'px';
+            text.style.color = '#ffc107';
+            document.getElementById('viewer').appendChild(text);
+            lineDrawingElements.push(text);
+            
+            // Create drag handle at the end of the yellow line
+            const handle = document.createElement('div');
+            handle.className = 'yellow-line-handle';
+            handle.style.position = 'absolute';
+            handle.style.width = '12px';
+            handle.style.height = '12px';
+            handle.style.backgroundColor = '#ffc107';
+            handle.style.border = '2px solid #ffffff';
+            handle.style.borderRadius = '50%';
+            handle.style.cursor = 'grab';
+            handle.style.left = (screenX + lineLength - 6) + 'px';
+            handle.style.top = (screenY - 6) + 'px';
+            handle.style.zIndex = '1000';
+            document.getElementById('viewer').appendChild(handle);
+            lineDrawingElements.push(handle);
+            
+            // Store line data for adjustment
+            yellowCubeLines.push({
+                cube: cube,
+                line: line,
+                text: text,
+                handle: handle,
+                startPoint: { x: screenX, y: screenY },
+                angle: lineAngle,
+                length: lineLength,
+                originalLength: lineLength,
+                originalAngle: lineAngle,
+                baseLength: baseLength
+            });
+            
+            // Add drag functionality to the yellow line
+            addYellowLineDragFunctionality(line, handle, screenX, screenY, lineAngle);
+            
+            // Show line adjustment controls and set initial values
+            showLineAdjustmentControls();
+            
+            // Set initial slider values to match the line
+            const lineLengthSlider = document.getElementById('lineLengthSlider');
+            const lineAngleSlider = document.getElementById('lineAngleSlider');
+            const lineLengthValue = document.getElementById('lineLengthValue');
+            const lineAngleValue = document.getElementById('lineAngleValue');
+            
+            if (lineLengthSlider) {
+                lineLengthSlider.value = lineLength;
+                console.log(`Set length slider to: ${lineLength}`);
+            }
+            if (lineAngleSlider) {
+                lineAngleSlider.value = lineAngle;
+                console.log(`Set angle slider to: ${lineAngle}`);
+            }
+            if (lineLengthValue) {
+                lineLengthValue.textContent = lineLength + ' px';
+            }
+            if (lineAngleValue) {
+                lineAngleValue.textContent = lineAngle + '°';
+            }
+            
+            // Show clear button
+            const clearYellowCubeLinesBtn = document.getElementById('clearYellowCubeLinesBtn');
+            if (clearYellowCubeLinesBtn) {
+                clearYellowCubeLinesBtn.style.display = 'inline-block';
+            }
+            
+            // Track the initial measurement
+            const measurement = trackScrewMeasurement(lineLength, lineAngle);
+            
+            console.log(`Line drawn from yellow cube: ${distanceMm.toFixed(1)} mm, length: ${lineLength}px`);
+            console.log('Initial measurement tracked:', measurement);
+        }
+        
+        function addYellowLineDragFunctionality(line, handle, startX, startY, originalAngle) {
+            let isDragging = false;
+            let dragStartX, dragStartY;
+            let originalLength;
+            
+            // Add event listeners to both line and handle
+            [line, handle].forEach(element => {
+                element.addEventListener('mousedown', function(e) {
+                    isDragging = true;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                    originalLength = parseFloat(line.style.width);
+                    line.style.cursor = 'grabbing';
+                    handle.style.cursor = 'grabbing';
+                    e.preventDefault();
+                    console.log('Started dragging yellow line, current length:', originalLength);
+                });
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const deltaX = e.clientX - dragStartX;
+                const deltaY = e.clientY - dragStartY;
+                
+                // Calculate new length based on drag distance (allow both increase and decrease)
+                const dragDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                // Use drag direction to determine if we're increasing or decreasing
+                const dragDirection = deltaX > 0 ? 1 : -1; // Positive X = increase, Negative X = decrease
+                const newLength = Math.max(25, Math.min(300, originalLength + (dragDistance * 0.5 * dragDirection)));
+                
+                console.log(`Drag distance: ${dragDistance}, direction: ${dragDirection}, new length: ${newLength}`);
+                
+                // Update line width
+                line.style.width = newLength + 'px';
+                
+                // Update handle position
+                const angleRad = (originalAngle * Math.PI) / 180;
+                const handleX = startX + newLength * Math.cos(angleRad) - 6;
+                const handleY = startY + newLength * Math.sin(angleRad) - 6;
+                handle.style.left = handleX + 'px';
+                handle.style.top = handleY + 'px';
+                
+                // Update text position and content
+                const distanceMm = (newLength / scaleFactor) / 10;
+                const textElements = lineDrawingElements.filter(el => el.className === 'measurement-text');
+                textElements.forEach(text => {
+                    text.textContent = `${distanceMm.toFixed(1)} mm`;
+                    const textX = startX + (newLength / 2) * Math.cos(angleRad);
+                    const textY = startY + (newLength / 2) * Math.sin(angleRad) - 30;
+                    text.style.left = textX + 'px';
+                    text.style.top = textY + 'px';
+                });
+                
+                // Update slider values
+                const lineLengthSlider = document.getElementById('lineLengthSlider');
+                const lineLengthValue = document.getElementById('lineLengthValue');
+                if (lineLengthSlider) lineLengthSlider.value = newLength;
+                if (lineLengthValue) lineLengthValue.textContent = newLength + ' px';
+                
+                console.log(`Dragging yellow line: new length = ${newLength}px, distance = ${distanceMm.toFixed(1)}mm`);
+            });
+            
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    line.style.cursor = 'pointer';
+                    handle.style.cursor = 'grab';
+                    
+                    // Track the measurement when dragging finishes
+                    const finalLength = parseFloat(line.style.width);
+                    const finalAngle = originalAngle;
+                    const measurement = trackScrewMeasurement(finalLength, finalAngle);
+                    
+                    console.log('Stopped dragging yellow line and tracked measurement:', measurement);
+                }
+            });
+        }
+        
+        function adjustYellowCubeLine() {
+            const lineLengthSlider = document.getElementById('lineLengthSlider');
+            const lineAngleSlider = document.getElementById('lineAngleSlider');
+            
+            if (!lineLengthSlider || !lineAngleSlider || yellowCubeLines.length === 0) {
+                console.log('adjustYellowCubeLine: Missing elements or no lines');
+                console.log('lineLengthSlider:', lineLengthSlider);
+                console.log('lineAngleSlider:', lineAngleSlider);
+                console.log('yellowCubeLines.length:', yellowCubeLines.length);
+                return;
+            }
+            
+            // Length slider now controls actual pixel length (50-300 pixels)
+            const newLength = parseFloat(lineLengthSlider.value);
+            const angleOffset = parseFloat(lineAngleSlider.value);
+            
+            console.log(`adjustYellowCubeLine: newLength=${newLength}, angleOffset=${angleOffset}`);
+            console.log(`Number of yellow cube lines: ${yellowCubeLines.length}`);
+            
+            yellowCubeLines.forEach((lineData, index) => {
+                const newAngle = lineData.originalAngle + angleOffset;
+                
+                console.log(`Line ${index}: updating length=${newLength}, angle=${newAngle}`);
+                console.log(`Line element exists: ${!!lineData.line}`);
+                console.log(`Text element exists: ${!!lineData.text}`);
+                console.log(`Handle element exists: ${!!lineData.handle}`);
+                
+                // Update line element
+                if (lineData.line) {
+                    const oldWidth = lineData.line.style.width;
+                    const oldTransform = lineData.line.style.transform;
+                    lineData.line.style.width = newLength + 'px';
+                    lineData.line.style.transform = `rotate(${newAngle}deg)`;
+                    console.log(`Updated line element: width=${newLength}px (was ${oldWidth}), transform=rotate(${newAngle}deg) (was ${oldTransform})`);
+                } else {
+                    console.log(`Line ${index}: No line element found!`);
+                }
+                
+                // Update handle position
+                if (lineData.handle) {
+                    const angleRad = (newAngle * Math.PI) / 180;
+                    const handleX = lineData.startPoint.x + newLength * Math.cos(angleRad) - 6;
+                    const handleY = lineData.startPoint.y + newLength * Math.sin(angleRad) - 6;
+                    lineData.handle.style.left = handleX + 'px';
+                    lineData.handle.style.top = handleY + 'px';
+                    console.log(`Updated handle position: (${handleX}, ${handleY})`);
+                } else {
+                    console.log(`Line ${index}: No handle element found!`);
+                }
+                
+                // Update text position and content
+                if (lineData.text) {
+                    const distanceMm = (newLength / scaleFactor) / 10;
+                    const oldText = lineData.text.textContent;
+                    lineData.text.textContent = `${distanceMm.toFixed(1)} mm`;
+                    
+                    // Update text position based on new angle and length
+                    const angleRad = (newAngle * Math.PI) / 180;
+                    const textX = lineData.startPoint.x + (newLength / 2) * Math.cos(angleRad);
+                    const textY = lineData.startPoint.y + (newLength / 2) * Math.sin(angleRad) - 30;
+                    lineData.text.style.left = textX + 'px';
+                    lineData.text.style.top = textY + 'px';
+                    
+                    console.log(`Updated text: ${distanceMm.toFixed(1)} mm (was ${oldText}) at (${textX}, ${textY})`);
+                } else {
+                    console.log(`Line ${index}: No text element found!`);
+                }
+                
+                // Update stored data
+                lineData.length = newLength;
+                lineData.angle = newAngle;
+            });
+            
+            // Track the adjusted measurement
+            const measurement = trackScrewMeasurement(newLength, newAngle);
+            console.log('Measurement adjusted and tracked:', measurement);
+        }
+        
+        function clearYellowCubeLines() {
+            yellowCubeLines = [];
+            lineDrawingElements.forEach(element => {
+                if (element.parentNode) {
+                    element.parentNode.removeChild(element);
+                }
+            });
+            lineDrawingElements = [];
+            selectedYellowCube = null;
+            
+            // Reset measurements when clearing lines
+            screwMeasurements = [];
+            measurementCounter = 1;
+            
+            // Update the measurements display
+            updateMeasurementsDisplay();
+            
+            // Hide line adjustment controls
+            const lineAdjustmentControls = document.getElementById('lineAdjustmentControls');
+            if (lineAdjustmentControls) {
+                lineAdjustmentControls.style.display = 'none';
+            }
+            
+            console.log('Yellow cube lines cleared and measurements reset');
+        }
+        
+        // Track screw measurement when dragging finishes
+        function trackScrewMeasurement(length, angle) {
+            const distanceMm = (length / scaleFactor) / 10;
+            const measurement = {
+                id: measurementCounter,
+                name: `Screw ${measurementCounter}`,
+                distance: distanceMm.toFixed(1),
+                angle: angle.toFixed(1),
+                timestamp: new Date().toISOString()
+            };
+            
+            screwMeasurements.push(measurement);
+            measurementCounter++;
+            
+            console.log(`Tracked measurement: ${measurement.name} - ${measurement.distance} mm at ${measurement.angle}°`);
+            
+            // Update the measurements display
+            updateMeasurementsDisplay();
+            
+            return measurement;
+        }
+        
+        // Generate PDF report
+        function generatePDFReport() {
+            if (screwMeasurements.length === 0) {
+                alert('No measurements to export. Please create some measurements first.');
+                return;
+            }
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Add title
+            doc.setFontSize(20);
+            doc.text('Screw Measurement Report', 20, 30);
+            
+            // Add plate information
+            doc.setFontSize(12);
+            doc.text(`Plate Name: ${plateName}`, 20, 50);
+            doc.text(`Report Date: ${new Date().toLocaleDateString()}`, 20, 60);
+            doc.text(`Total Measurements: ${screwMeasurements.length}`, 20, 70);
+            
+            // Add measurements table
+            doc.setFontSize(14);
+            doc.text('Measurements:', 20, 90);
+            
+            doc.setFontSize(10);
+            let yPosition = 110;
+            
+            screwMeasurements.forEach((measurement, index) => {
+                if (yPosition > 250) {
+                    doc.addPage();
+                    yPosition = 30;
+                }
+                
+                doc.text(`${measurement.name}:`, 20, yPosition);
+                doc.text(`Distance: ${measurement.distance} mm`, 40, yPosition + 5);
+                doc.text(`Angle: ${measurement.angle}°`, 40, yPosition + 10);
+                doc.text(`Time: ${new Date(measurement.timestamp).toLocaleTimeString()}`, 40, yPosition + 15);
+                
+                yPosition += 25;
+            });
+            
+            // Add summary
+            if (screwMeasurements.length > 0) {
+                const avgDistance = (screwMeasurements.reduce((sum, m) => sum + parseFloat(m.distance), 0) / screwMeasurements.length).toFixed(1);
+                doc.setFontSize(12);
+                doc.text(`Average Distance: ${avgDistance} mm`, 20, yPosition + 10);
+            }
+            
+            // Save the PDF
+            const filename = `screw_measurements_${plateName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+            doc.save(filename);
+            
+            console.log('PDF report generated:', filename);
+        }
+        
+        // Update measurements display
+        function updateMeasurementsDisplay() {
+            const measurementsList = document.getElementById('measurementsList');
+            if (!measurementsList) return;
+            
+            if (screwMeasurements.length === 0) {
+                measurementsList.innerHTML = '<p style="color: #666; font-style: italic;">No measurements yet. Draw lines to start tracking.</p>';
+                return;
+            }
+            
+            let html = '<div style="margin-bottom: 10px;">';
+            html += `<strong>Plate: ${plateName}</strong><br>`;
+            html += `<small>Total Measurements: ${screwMeasurements.length}</small>`;
+            html += '</div>';
+            
+            screwMeasurements.forEach((measurement, index) => {
+                html += `<div style="border: 1px solid #ddd; padding: 8px; margin: 5px 0; border-radius: 5px; background: #f9f9f9;">`;
+                html += `<strong>${measurement.name}</strong><br>`;
+                html += `Distance: ${measurement.distance} mm<br>`;
+                html += `Angle: ${measurement.angle}°<br>`;
+                html += `<small>Time: ${new Date(measurement.timestamp).toLocaleTimeString()}</small>`;
+                html += '</div>';
+            });
+            
+            measurementsList.innerHTML = html;
+        }
+        
+        // Activate line drawing button
+        const activateLineDrawingBtn = document.getElementById('activateLineDrawingBtn');
+        if (activateLineDrawingBtn) {
+            activateLineDrawingBtn.addEventListener('click', function() {
+                if (lineDrawingMode) {
+                    deactivateLineDrawing();
+                } else {
+                    activateLineDrawing();
+                }
+            });
+        }
+        
+        // Clear yellow cube lines button
+        const clearYellowCubeLinesBtn = document.getElementById('clearYellowCubeLinesBtn');
+        if (clearYellowCubeLinesBtn) {
+            clearYellowCubeLinesBtn.addEventListener('click', clearYellowCubeLines);
+        }
+        
+        // Clear line drawing button
+        const clearLineDrawingBtn = document.getElementById('clearLineDrawingBtn');
+        if (clearLineDrawingBtn) {
+            clearLineDrawingBtn.addEventListener('click', function() {
+                clearYellowCubeLines();
+                // Hide the clear button
+                clearLineDrawingBtn.style.display = 'none';
+                // Show the activate button
+                const activateBtn = document.getElementById('activateLineDrawingBtn');
+                if (activateBtn) {
+                    activateBtn.style.display = 'inline-block';
+                }
+            });
+        }
+        
+        // Export report button
+        const exportReportBtn = document.getElementById('exportReportBtn');
+        if (exportReportBtn) {
+            exportReportBtn.addEventListener('click', generatePDFReport);
+        }
+    </script>
+</body>
+</html>
