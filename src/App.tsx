@@ -7,11 +7,12 @@ import NewPatientForm from './components/NewPatientForm';
 import CalibrationAnnotation from './components/CalibrationAnnotation';
 import BoneAnnotation from './components/BoneAnnotation';
 import ImplantTemplating from './components/ImplantTemplating';
+import NewPage from './components/NewPage';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'newPatient' | 'calibration' | 'boneAnnotation' | 'implantTemplating'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'newPatient' | 'calibration' | 'boneAnnotation' | 'implantTemplating' | 'newPage'>('dashboard');
   const [patientData, setPatientData] = useState({
     patientId: '',
     firstName: '',
@@ -60,11 +61,24 @@ function App() {
   };
 
   const handleImplantTemplatingSave = () => {
-    // Handle final save and return to dashboard
-    setCurrentView('dashboard');
+    // Navigate to the new page after implant templating
+    setCurrentView('newPage');
+  };
+
+  const handleNewPageBack = () => {
+    setCurrentView('implantTemplating');
   };
 
   if (isLoggedIn) {
+    if (currentView === 'newPage') {
+      return (
+        <NewPage 
+          onBack={handleNewPageBack}
+          patientData={patientData}
+        />
+      );
+    }
+    
     if (currentView === 'implantTemplating') {
       return (
         <ImplantTemplating 
